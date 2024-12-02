@@ -5,4 +5,5 @@ enum MonitoringType { solar, house, battery }
 abstract class MonitoringRepository {
   Future<List<MonitoringData>> fetchMonitoringData(
       String date, MonitoringType type);
+  void clearCache();
 }
