@@ -1,10 +1,11 @@
-import 'package:enpal_challenge/domain/data/model/monitoring_data.dart';
+import 'package:enpal_challenge/bloc/monitoring_bloc.dart';
+import 'package:enpal_challenge/bloc/monitoring_event.dart';
 import 'package:enpal_challenge/domain/data/repositories/monitoring_repository_impl.dart';
 import 'package:enpal_challenge/domain/repositories/monitoring_repository.dart';
 import 'package:enpal_challenge/presentation/pages/chart_page.dart';
-import 'package:enpal_challenge/presentation/theme/colors.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:enpal_challenge/presentation/pages/date_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 void main() {
@@ -16,119 +17,89 @@ class ForTesting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(home: Scaffold(body: Center(child: DatePicker())));
-  }
-}
-
-class Wrapper extends StatelessWidget {
-  const Wrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: DefaultTabController(
-        length: 3,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Monitoring Data'),
-            bottom: const TabBar(
-              tabs: [
-                Tab(icon: Icon(Icons.sunny), text: 'Solar'),
-                Tab(icon: Icon(Icons.home), text: 'House'),
-                Tab(icon: Icon(Icons.battery_full), text: 'Battery'),
-              ],
-            ),
-          ),
-          body: const TabBarView(
-            children: [
-              DataPoints(
-                date: '2024-12-12',
-              ),
-              Icon(Icons.directions_transit),
-              Icon(Icons.directions_bike),
-            ],
-          ),
+    final repository =
+        MonitoringRepositoryImpl(baseUrl: 'http://localhost:3000');
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => MonitoringBloc(repository: repository),
         ),
-      ),
+      ],
+      child:
+          const MaterialApp(home: Scaffold(body: Center(child: DatePicker()))),
     );
   }
 }
 
-class DataPoints extends StatelessWidget {
-  const DataPoints({super.key, required this.date});
+class Wrapper extends StatefulWidget {
+  const Wrapper({super.key});
 
-  final String date;
+  @override
+  State<Wrapper> createState() => _WrapperState();
+}
 
-  String _formatTime(DateTime timestamp) {
-    return DateFormat.Hm().format(timestamp);
+class _WrapperState extends State<Wrapper> {
+  final String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<MonitoringBloc>();
+    bloc.add(
+        FetchMonitoringData(date: selectedDate, type: MonitoringType.solar));
+    bloc.add(
+        FetchMonitoringData(date: selectedDate, type: MonitoringType.house));
+    bloc.add(
+        FetchMonitoringData(date: selectedDate, type: MonitoringType.battery));
   }
 
   @override
   Widget build(BuildContext context) {
-    final repository =
-        MonitoringRepositoryImpl(baseUrl: 'http://localhost:3000');
-
-    return FutureBuilder<List<MonitoringData>>(
-      future: repository.fetchMonitoringData(date, MonitoringType.solar),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No data available'));
-        } else {
-          final data = snapshot.data!;
-          final double chartWidth = data.length *
-              50.0; // We leave 50px space between each data point on the x-axis for better readability
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: chartWidth < MediaQuery.of(context).size.width
-                  ? MediaQuery.of(context).size.width
-                  : chartWidth,
-              child: LineChart(
-                LineChartData(
-                  minX: 0,
-                  maxX: (data.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: 10000,
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            _formatTime(data[value.toInt()].timestamp),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: true)),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: data
-                          .asMap()
-                          .entries
-                          .map((e) => FlSpot(
-                              e.key.toDouble(), e.value.value.toDouble()))
-                          .toList(),
-                      color: AppColors.darkBlue,
-                      isCurved: true,
-                      dotData: const FlDotData(show: false),
-                    ),
-                  ],
-                ),
-              ),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Monitoring Data'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.sunny), text: 'Solar'),
+              Tab(icon: Icon(Icons.home), text: 'House'),
+              Tab(icon: Icon(Icons.battery_full), text: 'Battery'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                context.read<MonitoringBloc>().add(ClearMonitoringCache());
+                context.read<MonitoringBloc>().add(FetchMonitoringData(
+                    date: selectedDate, type: MonitoringType.solar));
+                context.read<MonitoringBloc>().add(FetchMonitoringData(
+                    date: selectedDate, type: MonitoringType.house));
+                context.read<MonitoringBloc>().add(FetchMonitoringData(
+                    date: selectedDate, type: MonitoringType.battery));
+              },
+              tooltip: 'Refresh Data',
             ),
-          );
-        }
-      },
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            DataPoints(
+              date: selectedDate,
+              type: MonitoringType.solar,
+            ),
+            DataPoints(
+              date: selectedDate,
+              type: MonitoringType.house,
+            ),
+            DataPoints(
+              date: selectedDate,
+              type: MonitoringType.battery,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
