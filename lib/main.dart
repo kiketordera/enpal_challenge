@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:enpal_challenge/bloc/monitoring_bloc.dart';
 import 'package:enpal_challenge/bloc/monitoring_event.dart';
 import 'package:enpal_challenge/domain/data/repositories/monitoring_repository_impl.dart';
@@ -25,32 +27,64 @@ class ForTesting extends StatelessWidget {
           create: (context) => MonitoringBloc(repository: repository),
         ),
       ],
-      child:
-          const MaterialApp(home: Scaffold(body: Center(child: DatePicker()))),
+      child: MaterialApp(
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: Colors.white,
+        ),
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          primarySwatch: Colors.blue,
+          scaffoldBackgroundColor: Colors.grey[900],
+        ),
+        themeMode: ThemeMode.system,
+        home: const Scaffold(body: Center(child: DatePicker())),
+      ),
     );
   }
 }
 
 class Wrapper extends StatefulWidget {
-  const Wrapper({super.key});
+  final String selectedDate;
+  const Wrapper({super.key, required this.selectedDate});
 
   @override
   State<Wrapper> createState() => _WrapperState();
 }
 
 class _WrapperState extends State<Wrapper> {
-  final String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  late String selectedDate;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
+    selectedDate = widget.selectedDate;
     final bloc = context.read<MonitoringBloc>();
+    // Initial fetch
     bloc.add(
         FetchMonitoringData(date: selectedDate, type: MonitoringType.solar));
     bloc.add(
         FetchMonitoringData(date: selectedDate, type: MonitoringType.house));
     bloc.add(
         FetchMonitoringData(date: selectedDate, type: MonitoringType.battery));
+
+    // Set up polling every 60 seconds
+    _pollingTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+      bloc.add(
+          FetchMonitoringData(date: selectedDate, type: MonitoringType.solar));
+      bloc.add(
+          FetchMonitoringData(date: selectedDate, type: MonitoringType.house));
+      bloc.add(FetchMonitoringData(
+          date: selectedDate, type: MonitoringType.battery));
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -68,6 +102,13 @@ class _WrapperState extends State<Wrapper> {
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.sync_alt),
+              onPressed: () {
+                context.read<MonitoringBloc>().add(const ToggleUnit());
+              },
+              tooltip: 'Toggle Units (W/kW)',
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {

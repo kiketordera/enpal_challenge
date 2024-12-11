@@ -15,11 +15,12 @@ class MonitoringLoading extends MonitoringState {}
 
 class MonitoringLoaded extends MonitoringState {
   final Map<MonitoringType, List<MonitoringData>> data;
+  final bool isKilowatts;
 
-  const MonitoringLoaded({required this.data});
+  const MonitoringLoaded({required this.data, required this.isKilowatts});
 
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [data, isKilowatts];
 }
 
 class MonitoringError extends MonitoringState {

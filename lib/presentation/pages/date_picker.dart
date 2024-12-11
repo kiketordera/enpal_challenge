@@ -53,7 +53,7 @@ class _DatePickerState extends State<DatePicker> {
             child: ElevatedButton(
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) {
-                    return const Wrapper();
+                    return Wrapper(selectedDate: formattedDate);
                   }));
                 },
                 child: const Text('Show Data')),

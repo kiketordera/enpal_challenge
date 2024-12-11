@@ -1,4 +1,5 @@
 import 'package:enpal_challenge/bloc/monitoring_bloc.dart';
+import 'package:enpal_challenge/bloc/monitoring_event.dart';
 import 'package:enpal_challenge/bloc/monitoring_state.dart';
 import 'package:enpal_challenge/domain/repositories/monitoring_repository.dart';
 import 'package:enpal_challenge/presentation/theme/colors.dart';
@@ -35,53 +36,79 @@ class DataPoints extends StatelessWidget {
             return const Center(child: Text('No data available'));
           }
 
+          final unitFactor = state.isKilowatts ? 0.001 : 1.0;
+          final unitLabel = state.isKilowatts ? 'kW' : 'W';
+
           final double chartWidth = data.length * 50.0;
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: chartWidth < MediaQuery.of(context).size.width
-                  ? MediaQuery.of(context).size.width
-                  : chartWidth,
-              child: LineChart(
-                LineChartData(
-                  minX: 0,
-                  maxX: (data.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: 10000,
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            _formatTime(data[value.toInt()].timestamp),
-                          );
-                        },
+          return RefreshIndicator(
+            onRefresh: () async {
+              context
+                  .read<MonitoringBloc>()
+                  .add(FetchMonitoringData(date: date, type: type));
+            },
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: chartWidth < MediaQuery.of(context).size.width
+                    ? MediaQuery.of(context).size.width
+                    : chartWidth,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: LineChart(
+                        LineChartData(
+                          minX: 0,
+                          maxX: (data.length - 1).toDouble(),
+                          minY: 0,
+                          maxY: state.isKilowatts ? 10 : 10000,
+                          titlesData: FlTitlesData(
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    _formatTime(data[value.toInt()].timestamp),
+                                  );
+                                },
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 80,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                      '${value.toStringAsFixed(1)} $unitLabel');
+                                },
+                              ),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                          ),
+                          borderData: FlBorderData(show: true),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: data
+                                  .asMap()
+                                  .entries
+                                  .map((e) => FlSpot(
+                                        e.key.toDouble(),
+                                        e.value.value.toDouble() * unitFactor,
+                                      ))
+                                  .toList(),
+                              color: AppColors.darkBlue,
+                              isCurved: true,
+                              barWidth: 2,
+                              dotData: const FlDotData(show: false),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: true),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: data
-                          .asMap()
-                          .entries
-                          .map((e) => FlSpot(
-                                e.key.toDouble(),
-                                e.value.value.toDouble(),
-                              ))
-                          .toList(),
-                      color: AppColors.darkBlue,
-                      isCurved: true,
-                      barWidth: 2,
-                      dotData: const FlDotData(show: false),
                     ),
                   ],
                 ),
